@@ -474,7 +474,10 @@ def main():
         argument_spec=dict(
             name=dict(type='str', required=True),
             plist=dict(type='str'),
-            state=dict(type='str', choices=['reloaded', 'restarted', 'started', 'stopped', 'unloaded']),
+            state=dict(
+                type='str',
+                choices=['reloaded', 'restarted', 'started', 'stopped', 'unloaded'],
+            ),
             enabled=dict(type='bool'),
             force_stop=dict(type='bool', default=False),
         ),
