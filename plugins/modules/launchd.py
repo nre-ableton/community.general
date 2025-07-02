@@ -160,7 +160,7 @@ class Plist:
         else:
             self.__filename = '%s.plist' % service
 
-        state, pid, dummy, dummy = LaunchCtlList(module, self.__service).run()
+        state, pid, _, _ = LaunchCtlList(module, self.__service).run()
 
         # Check if readPlist is available or not
         self.old_plistlib = hasattr(plistlib, 'readPlist')
@@ -377,7 +377,7 @@ class LaunchCtlStart(LaunchCtlTask):
         super(LaunchCtlStart, self).__init__(module, service, plist)
 
     def runCommand(self):
-        state, dummy, dummy, dummy = self.get_state()
+        state, _, _, _ = self.get_state()
 
         if state in (ServiceState.STOPPED, ServiceState.LOADED):
             self.reload()
@@ -404,7 +404,7 @@ class LaunchCtlStop(LaunchCtlTask):
         super(LaunchCtlStop, self).__init__(module, service, plist)
 
     def runCommand(self):
-        state, dummy, dummy, dummy = self.get_state()
+        state, _, _, _ = self.get_state()
 
         if state == ServiceState.STOPPED:
             # In case the service is stopped and we might later decide
@@ -431,7 +431,7 @@ class LaunchCtlReload(LaunchCtlTask):
         super(LaunchCtlReload, self).__init__(module, service, plist)
 
     def runCommand(self):
-        state, dummy, dummy, dummy = self.get_state()
+        state, _, _, _ = self.get_state()
 
         if state == ServiceState.UNLOADED:
             # launchd throws an error if we do an unload on an already
@@ -446,7 +446,7 @@ class LaunchCtlUnload(LaunchCtlTask):
         super(LaunchCtlUnload, self).__init__(module, service, plist)
 
     def runCommand(self):
-        state, dummy, dummy, dummy = self.get_state()
+        state, _, _, _ = self.get_state()
         self.unload()
 
 
