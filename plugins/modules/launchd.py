@@ -502,7 +502,7 @@ def main():
     result['changed'] = plist.is_changed()
 
     # Gather information about the service to be controlled.
-    state, pid, dummy, dummy = LaunchCtlList(module, service).run()
+    state, pid, _, _ = LaunchCtlList(module, service).run()
     result['status']['previous_state'] = ServiceState.to_string(state)
     result['status']['previous_pid'] = pid
 
