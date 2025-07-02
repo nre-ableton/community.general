@@ -341,6 +341,18 @@ class LaunchCtlTask(object):
         sleep(self.WAITING_TIME)
         return (rc, out, err)
 
+    def bootstrap(self, uid):
+        rc, out, err = self._launchctl("bootstrap", uid)
+        # Unfortunately launchd does not wait until the process really started.
+        sleep(self.WAITING_TIME)
+        return (rc, out, err)
+
+    def bootout(self, uid):
+        rc, out, err = self._launchctl("bootout", uid)
+        # Unfortunately launchd does not wait until the process really started.
+        sleep(self.WAITING_TIME)
+        return (rc, out, err)
+
     def restart(self):
         # TODO: check for rc, out, err
         self.stop()
@@ -357,12 +369,14 @@ class LaunchCtlTask(object):
     def unload(self):
         return self._launchctl("unload")
 
-    def _launchctl(self, command):
+    def _launchctl(self, command, uid=None):
         service_or_plist = self._plist.get_file() if command in [
             'load', 'unload'] else self._service if command in ['start', 'stop'] else ""
 
+        safe_uid_arg = 'gui/{} '.format(uid) if uid is not None else ''
+
         rc, out, err = self._module.run_command(
-            '%s %s %s' % (self._launch, command, service_or_plist))
+            '%s %s %s%s' % (self._launch, command, safe_uid_arg, service_or_plist))
 
         if rc != 0:
             msg = "Unable to %s '%s' (%s): '%s'" % (
@@ -441,6 +455,61 @@ class LaunchCtlReload(LaunchCtlTask):
             self.reload()
 
 
+class LaunchCtlBootstrap(LaunchCtlTask):
+    def __init__(self, module, service, plist, uid):
+        super(LaunchCtlBootstrap, self).__init__(module, service, plist)
+        self._uid = uid
+
+    def runCommand(self):
+        state, _, _, _ = self.get_state()
+
+        if state in (ServiceState.STOPPED, ServiceState.LOADED):
+            self.reload()
+            self.bootstrap(self._uid)
+        elif state == ServiceState.STARTED:
+            # In case the service is already in started state but the
+            # job definition was changed we need to unload/load the
+            # service and start the service again.
+            if self._plist.is_changed():
+                self.reload()
+                self.bootstrap(self._uid)
+        elif state == ServiceState.UNLOADED:
+            self.load()
+            self.bootstrap(self._uid)
+        elif state == ServiceState.UNKNOWN:
+            # We are in an unknown state, let's try to reload the config
+            # and start the service again.
+            self.reload()
+            self.bootstrap(self._uid)
+
+class LaunchCtlBootout(LaunchCtlTask):
+    def __init__(self, module, service, plist, uid):
+        super(LaunchCtlBootout, self).__init__(module, service, plist)
+        self._uid = uid
+
+    def runCommand(self):
+        state, _, _, _ = self.get_state()
+
+        if state in (ServiceState.STOPPED, ServiceState.LOADED):
+            self.reload()
+            self.bootout(self._uid)
+        elif state == ServiceState.STARTED:
+            # In case the service is already in started state but the
+            # job definition was changed we need to unload/load the
+            # service and start the service again.
+            if self._plist.is_changed():
+                self.reload()
+                self.bootout(self._uid)
+        elif state == ServiceState.UNLOADED:
+            self.load()
+            self.bootout(self._uid)
+        elif state == ServiceState.UNKNOWN:
+            # We are in an unknown state, let's try to reload the config
+            # and start the service again.
+            self.reload()
+            self.bootout(self._uid)
+
+
 class LaunchCtlUnload(LaunchCtlTask):
     def __init__(self, module, service, plist):
         super(LaunchCtlUnload, self).__init__(module, service, plist)
@@ -481,10 +550,14 @@ def main():
                     'restarted',
                     'started',
                     'stopped',
+                    'bootstrap',
+                    'bootout',
                     'unloaded',
                 ],
             ),
             enabled=dict(type='bool'),
+            bootstrap=dict(type='bool', default=False),
+            uid=dict(type='int'),
             force_stop=dict(type='bool', default=False),
         ),
         supports_check_mode=True,
@@ -502,6 +575,9 @@ def main():
         'status': {},
     }
 
+    if action in ('bootstrap', 'bootout') and module.params['uid'] is None:
+        module.fail_json(msg="UID required for bootstrap/bootout state")
+
     # We will tailor the plist file in case one of the options
     # (enabled, force_stop) was specified.
     plist = Plist(module, service, plist_filename)
@@ -518,6 +594,8 @@ def main():
         'stopped': LaunchCtlStop(module, service, plist),
         'restarted': LaunchCtlRestart(module, service, plist),
         'reloaded': LaunchCtlReload(module, service, plist),
+        'bootstrap': LaunchCtlBootstrap(module, service, plist, module.params['uid']),
+        'bootout': LaunchCtlBootout(module, service, plist, module.params['uid']),
         'unloaded': LaunchCtlUnload(module, service, plist)
     }
 
