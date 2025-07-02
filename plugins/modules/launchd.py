@@ -476,7 +476,13 @@ def main():
             plist=dict(type='str'),
             state=dict(
                 type='str',
-                choices=['reloaded', 'restarted', 'started', 'stopped', 'unloaded'],
+                choices=[
+                    'reloaded',
+                    'restarted',
+                    'started',
+                    'stopped',
+                    'unloaded',
+                ],
             ),
             enabled=dict(type='bool'),
             force_stop=dict(type='bool', default=False),
